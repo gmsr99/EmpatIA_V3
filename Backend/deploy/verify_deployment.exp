@@ -1,0 +1,30 @@
+#!/usr/bin/expect
+
+set timeout 20
+set host "72.60.89.5"
+set user "root"
+set password "3f-O78sAL@e/?cDw,Q.D"
+
+# 1. Check Container Status
+puts "\n--- CONTAINER STATUS ---"
+spawn ssh -o StrictHostKeyChecking=no $user@$host "docker ps -a --filter name=empatia-backend"
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+# 2. Check Logs
+puts "\n--- CONTAINER LOGS (Last 20 lines) ---"
+spawn ssh -o StrictHostKeyChecking=no $user@$host "docker logs --tail 20 empatia-backend"
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+# 3. Check Health
+puts "\n--- CONTAINER HEALTH ---"
+spawn ssh -o StrictHostKeyChecking=no $user@$host "docker inspect --format='{{json .State.Health.Status}}' empatia-backend"
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}

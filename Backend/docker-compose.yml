@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  empatia-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: empatia-backend
+    restart: unless-stopped
+
+    # Variáveis de ambiente (pode usar .env)
+    env_file:
+      - .env
+
+    # Portas
+    ports:
+      - "8765:8765"  # WebSocket
+
+    # Volumes
+    volumes:
+      - ./vertex-key.json:/app/vertex-key.json:ro  # Read-only
+      - ./logs:/app/logs  # Logs persistentes
+
+    # Networking - conectar à rede do PostgreSQL existente
+    # Se o PostgreSQL já está num container, usar a mesma rede
+    # Substitua 'postgres_network' pelo nome real da rede
+    # Networking - conectar à rede do host para acessar PostgreSQL localmente
+    network_mode: host
+    # Remover portas pois host mode usa as do sistema
+    # ports:
+    #   - "8765:8765"
+
+# Redes - não necessário com network_mode: host
+# networks:
+#   empatia_network:
+#     external: true
+#     name: postgres_network
+
+# Volumes (opcional - para logs persistentes)
+volumes:
+  logs:
+    driver: local

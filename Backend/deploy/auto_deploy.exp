@@ -1,0 +1,37 @@
+#!/usr/bin/expect
+
+set timeout 600
+set host "72.60.89.5"
+set user "root"
+set password "3f-O78sAL@e/?cDw,Q.D"
+set src_dir "/Users/gmsr44/Desktop/EmpatIA/8. Website/1. Agente com ADK/3. EmpatIA V3/Backend/"
+set remote_dir "/opt/empatia"
+
+# Log info
+puts "Starting deployment to $host..."
+
+# 1. Create remote directory
+puts "Creating remote directory..."
+spawn ssh -o StrictHostKeyChecking=no $user@$host "mkdir -p $remote_dir"
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+# 2. Rsync files
+puts "Syncing files..."
+spawn rsync -avz --exclude venv --exclude __pycache__ --exclude .git -e "ssh -o StrictHostKeyChecking=no" $src_dir $user@$host:$remote_dir
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+# 3. Deploy
+puts "Building and running Docker containers..."
+spawn ssh -o StrictHostKeyChecking=no $user@$host "cd $remote_dir && docker compose build && docker compose up -d"
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+puts "Deployment script finished."

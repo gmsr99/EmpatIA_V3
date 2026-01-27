@@ -1,0 +1,22 @@
+#!/usr/bin/expect
+
+set timeout 20
+set host "72.60.89.5"
+set user "root"
+set password "3f-O78sAL@e/?cDw,Q.D"
+
+# 1. List ALL containers sorted by creation time (newest first)
+puts "\n--- ALL CONTAINERS (Newest First) ---"
+spawn ssh -o StrictHostKeyChecking=no $user@$host "docker ps -a --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.CreatedAt}}' | head -n 10"
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+# 2. Check for port conflicts (if any process acts on 8765)
+puts "\n--- PORT 8765 USAGE ---"
+spawn ssh -o StrictHostKeyChecking=no $user@$host "lsof -i :8765 || netstat -nlp | grep 8765"
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
