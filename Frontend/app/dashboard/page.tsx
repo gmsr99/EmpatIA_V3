@@ -82,10 +82,10 @@ export default async function DashboardPage() {
   );
 
   return (
-    <div className="min-h-screen px-6 pt-24 pb-12">
-      <div className="mx-auto max-w-5xl space-y-8">
+    <div className="h-screen overflow-hidden px-6 pt-24 pb-12">
+      <div className="mx-auto flex h-full max-w-5xl flex-col gap-8">
         {/* Header Section */}
-        <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-6 md:flex-row md:items-center">
+        <div className="flex shrink-0 flex-col justify-between gap-4 border-b border-white/10 pb-6 md:flex-row md:items-center">
           <div>
             <h1 className="text-3xl font-bold text-white">Área de Cliente</h1>
             <p className="mt-1 text-white/60">Bem-vindo de volta, {session.user.name}</p>
@@ -98,7 +98,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Account Info Card */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+        <div className="shrink-0 rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
           <h2 className="mb-4 text-xl font-semibold text-white">Dados da Conta</h2>
           <div className="grid gap-4 md:grid-cols-3">
             <div>
@@ -123,8 +123,8 @@ export default async function DashboardPage() {
         </div>
 
         {/* Memories Section */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
+        <div className="flex min-h-0 flex-1 flex-col gap-6">
+          <div className="flex shrink-0 items-center justify-between">
             <h2 className="text-2xl font-semibold text-white">Memórias da EmpatIA</h2>
             <span className="text-sm text-white/40">A EmpatIA lembra-se de si</span>
           </div>
@@ -145,7 +145,7 @@ export default async function DashboardPage() {
               </Link>
             </div>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid min-h-0 flex-1 gap-6 md:grid-cols-2">
               {Object.entries(memoriesByCategory).map(([category, categoryMemories]) => {
                 const config = categoryConfig[category] || categoryConfig.geral;
                 const Icon = config.icon;
@@ -153,9 +153,9 @@ export default async function DashboardPage() {
                 return (
                   <div
                     key={category}
-                    className={`rounded-2xl border ${config.color} p-5 backdrop-blur-md`}
+                    className={`flex flex-col rounded-2xl border ${config.color} p-5 backdrop-blur-md`}
                   >
-                    <div className="mb-4 flex items-center gap-3">
+                    <div className="mb-4 flex shrink-0 items-center gap-3">
                       <div className={`rounded-full p-2 ${config.color}`}>
                         <Icon className="h-5 w-5" />
                       </div>
@@ -168,7 +168,7 @@ export default async function DashboardPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="flex-1 space-y-3 overflow-y-auto pr-1">
                       {categoryMemories.map((memory) => (
                         <div
                           key={memory.id}
