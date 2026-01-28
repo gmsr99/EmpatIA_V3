@@ -200,9 +200,15 @@ class EmpatIAAgent:
             recent_episodes=context["recent_episodes"],
         )
 
-        # Configurar modelo com voice config e tools
+        # Configurar modelo com voice config, generation config e tools
         config = types.LiveConnectConfig(
             response_modalities=["AUDIO"],
+            system_instruction=types.Content(
+                parts=[types.Part(text=system_prompt)]
+            ),
+            generation_config=types.GenerationConfig(
+                temperature=settings.gemini_temperature,
+            ),
             speech_config=types.SpeechConfig(
                 voice_config=types.VoiceConfig(
                     prebuilt_voice_config=types.PrebuiltVoiceConfig(
@@ -238,15 +244,7 @@ class EmpatIAAgent:
             async with self.client.aio.live.connect(
                 model=settings.gemini_model, config=config
             ) as live_session:
-                logger.info("Conexão Live estabelecida, enviando system prompt")
-                # Enviar system instruction
-                await live_session.send_client_content(
-                    turns=types.Content(
-                        role="system",
-                        parts=[types.Part(text=system_prompt)],
-                    )
-                )
-                logger.info("System prompt enviado com sucesso")
+                logger.info("Conexão Live estabelecida (system_instruction no config)")
 
                 # Processar audio stream de entrada
                 async def send_audio():
