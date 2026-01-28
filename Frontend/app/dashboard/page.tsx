@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { Brain, Heart, Sparkles, Star, Users } from 'lucide-react';
 import { Pool } from 'pg';
 import { auth } from '@/auth';
 import { Button } from '@/components/ui/button';
-import { Heart, Brain, Users, Sparkles, Star } from 'lucide-react';
 
 const pool = new Pool({
   host: process.env.POSTGRES_HOST,
@@ -15,10 +15,22 @@ const pool = new Pool({
 
 // Ícones e cores para cada categoria
 const categoryConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-  familia: { icon: Users, color: 'text-pink-400 bg-pink-400/10 border-pink-400/20', label: 'Família' },
+  familia: {
+    icon: Users,
+    color: 'text-pink-400 bg-pink-400/10 border-pink-400/20',
+    label: 'Família',
+  },
   saude: { icon: Heart, color: 'text-red-400 bg-red-400/10 border-red-400/20', label: 'Saúde' },
-  hobbies: { icon: Sparkles, color: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20', label: 'Hobbies' },
-  interesses: { icon: Brain, color: 'text-purple-400 bg-purple-400/10 border-purple-400/20', label: 'Interesses' },
+  hobbies: {
+    icon: Sparkles,
+    color: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20',
+    label: 'Hobbies',
+  },
+  interesses: {
+    icon: Brain,
+    color: 'text-purple-400 bg-purple-400/10 border-purple-400/20',
+    label: 'Interesses',
+  },
   geral: { icon: Star, color: 'text-blue-400 bg-blue-400/10 border-blue-400/20', label: 'Geral' },
 };
 
@@ -42,15 +54,7 @@ export default async function DashboardPage() {
   // Buscar memórias do utilizador
   const client = await pool.connect();
   let memories: Memory[] = [];
-  let userProfile = null;
-
   try {
-    // Buscar perfil do utilizador
-    const profileRes = await client.query('SELECT * FROM users WHERE email = $1', [session.user.email]);
-    if (profileRes.rows.length > 0) {
-      userProfile = profileRes.rows[0];
-    }
-
     // Buscar memórias da tabela user_memories
     const memoriesRes = await client.query(
       `SELECT id, category, entity_type, entity_name, content, importance, created_at
@@ -67,12 +71,15 @@ export default async function DashboardPage() {
   }
 
   // Agrupar memórias por categoria
-  const memoriesByCategory = memories.reduce((acc, memory) => {
-    const cat = memory.category || 'geral';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(memory);
-    return acc;
-  }, {} as Record<string, Memory[]>);
+  const memoriesByCategory = memories.reduce(
+    (acc, memory) => {
+      const cat = memory.category || 'geral';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(memory);
+      return acc;
+    },
+    {} as Record<string, Memory[]>
+  );
 
   return (
     <div className="min-h-screen px-6 pt-24 pb-12">
@@ -119,9 +126,7 @@ export default async function DashboardPage() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-semibold text-white">Memórias da EmpatIA</h2>
-            <span className="text-sm text-white/40">
-              A EmpatIA lembra-se de si
-            </span>
+            <span className="text-sm text-white/40">A EmpatIA lembra-se de si</span>
           </div>
 
           {memories.length === 0 ? (
@@ -157,7 +162,8 @@ export default async function DashboardPage() {
                       <div>
                         <h3 className="font-semibold text-white">{config.label}</h3>
                         <span className="text-xs text-white/40">
-                          {categoryMemories.length} memória{categoryMemories.length !== 1 ? 's' : ''}
+                          {categoryMemories.length} memória
+                          {categoryMemories.length !== 1 ? 's' : ''}
                         </span>
                       </div>
                     </div>
@@ -179,10 +185,7 @@ export default async function DashboardPage() {
                             </div>
                             <div className="flex items-center gap-1">
                               {[...Array(Math.min(memory.importance, 5))].map((_, i) => (
-                                <Star
-                                  key={i}
-                                  className="h-3 w-3 fill-yellow-400 text-yellow-400"
-                                />
+                                <Star key={i} className="h-3 w-3 fill-yellow-400 text-yellow-400" />
                               ))}
                             </div>
                           </div>

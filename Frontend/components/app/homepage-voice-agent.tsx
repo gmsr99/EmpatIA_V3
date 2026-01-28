@@ -5,8 +5,8 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Loader2, MessageCircle, Mic, MicOff, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { GlowingRingVisualizer } from './glowing-ring-visualizer';
 import { useVoiceAgent } from '@/hooks/useVoiceAgent';
+import { GlowingRingVisualizer } from './glowing-ring-visualizer';
 
 export function HomepageVoiceAgent() {
   const { data: session, status } = useSession();
@@ -21,11 +21,10 @@ export function HomepageVoiceAgent() {
     isConnected,
     isMicEnabled,
     error: agentError,
-    micStream,
     outputStream,
     connect,
     disconnect,
-    toggleMic
+    toggleMic,
   } = useVoiceAgent(userId);
 
   // Combine local error state with agent error
