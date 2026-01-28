@@ -77,7 +77,11 @@ export function HomepageVoiceAgent() {
         <div className="relative flex h-full w-full flex-col items-center justify-center p-8">
           {/* Connection Status Label */}
           <div className="text-brand-lilac absolute top-6 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium tracking-wider uppercase backdrop-blur-md">
-            {state === 'speaking' ? 'A falar...' : state === 'listening' ? 'A ouvir...' : 'Em chamada'}
+            {state === 'speaking'
+              ? 'A falar...'
+              : state === 'listening'
+                ? 'A ouvir...'
+                : 'Em chamada'}
           </div>
 
           <div className="relative flex w-full flex-1 items-center justify-center">
@@ -95,10 +99,11 @@ export function HomepageVoiceAgent() {
               variant="ghost"
               size="icon"
               onClick={handleToggleMic}
-              className={`h-12 w-12 rounded-full border backdrop-blur-md transition-all ${isMicEnabled
-                ? 'border-white/20 bg-white/10 text-white hover:bg-white/20'
-                : 'border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20'
-                }`}
+              className={`h-12 w-12 rounded-full border backdrop-blur-md transition-all ${
+                isMicEnabled
+                  ? 'border-white/20 bg-white/10 text-white hover:bg-white/20'
+                  : 'border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20'
+              }`}
             >
               {isMicEnabled ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
             </Button>
@@ -161,7 +166,9 @@ export function HomepageVoiceAgent() {
           </Button>
 
           {displayError && (
-            <p className="max-w-[250px] animate-pulse text-center text-xs text-red-400">{displayError}</p>
+            <p className="max-w-[250px] animate-pulse text-center text-xs text-red-400">
+              {displayError}
+            </p>
           )}
         </div>
       </div>

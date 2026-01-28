@@ -52,18 +52,12 @@ export class WebSocketClient {
           this.emit('close', event);
 
           // Auto-reconnect se não foi fechado intencionalmente
-          if (
-            event.code !== 1000 &&
-            this.reconnectAttempts < this.maxReconnectAttempts
-          ) {
+          if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
             console.log(
               `🔄 Tentativa de reconexão ${this.reconnectAttempts}/${this.maxReconnectAttempts}`
             );
-            setTimeout(
-              () => this.connect(),
-              this.reconnectDelay * this.reconnectAttempts
-            );
+            setTimeout(() => this.connect(), this.reconnectDelay * this.reconnectAttempts);
           }
         };
 
@@ -135,10 +129,7 @@ export class WebSocketClient {
   /**
    * Adiciona listener de evento
    */
-  on<K extends keyof WebSocketClientEvents>(
-    event: K,
-    callback: WebSocketClientEvents[K]
-  ): void {
+  on<K extends keyof WebSocketClientEvents>(event: K, callback: WebSocketClientEvents[K]): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
@@ -148,10 +139,7 @@ export class WebSocketClient {
   /**
    * Remove listener de evento
    */
-  off<K extends keyof WebSocketClientEvents>(
-    event: K,
-    callback: WebSocketClientEvents[K]
-  ): void {
+  off<K extends keyof WebSocketClientEvents>(event: K, callback: WebSocketClientEvents[K]): void {
     const listeners = this.listeners.get(event);
     if (listeners) {
       listeners.delete(callback);
@@ -179,4 +167,3 @@ export class WebSocketClient {
     }
   }
 }
-

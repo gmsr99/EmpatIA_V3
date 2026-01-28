@@ -18,6 +18,7 @@ export class AudioPlaybackManager {
    */
   async initialize(): Promise<void> {
     if (!this.audioContext) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
         sampleRate: this.sampleRate,
       });
@@ -28,7 +29,7 @@ export class AudioPlaybackManager {
     }
 
     // Resume contexto se estiver suspenso
-    if (this.audioContext.state === "suspended") {
+    if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
     }
   }
@@ -45,7 +46,7 @@ export class AudioPlaybackManager {
    */
   async playAudioChunk(audioData: ArrayBuffer): Promise<void> {
     if (!this.audioContext) {
-      console.warn("AudioContext não inicializado");
+      console.warn('AudioContext não inicializado');
       return;
     }
 
@@ -76,7 +77,7 @@ export class AudioPlaybackManager {
         this.playNext();
       }
     } catch (error) {
-      console.error("Erro ao processar chunk de áudio:", error);
+      console.error('Erro ao processar chunk de áudio:', error);
     }
   }
 
@@ -125,7 +126,7 @@ export class AudioPlaybackManager {
       try {
         this.currentSource.stop();
         this.currentSource.disconnect();
-      } catch (error) {
+      } catch {
         // Ignorar erros se já foi parado
       }
       this.currentSource = null;
