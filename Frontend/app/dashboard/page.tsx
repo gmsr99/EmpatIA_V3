@@ -153,7 +153,7 @@ export default async function DashboardPage() {
                 return (
                   <div
                     key={category}
-                    className={`flex flex-col rounded-2xl border ${config.color} p-5 backdrop-blur-md`}
+                    className={`flex min-h-0 flex-col rounded-2xl border ${config.color} p-5 backdrop-blur-md`}
                   >
                     <div className="mb-4 flex shrink-0 items-center gap-3">
                       <div className={`rounded-full p-2 ${config.color}`}>
