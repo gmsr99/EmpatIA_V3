@@ -2,21 +2,19 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { Pool } from 'pg';
-import PostgresAdapter from '@auth/pg-adapter';
 
 const pool = new Pool({
-  host: process.env.POSTGRES_HOST || '72.60.89.5', // VPS IP
+  host: process.env.POSTGRES_HOST,
   port: parseInt(process.env.POSTGRES_PORT || '5433'),
-  user: process.env.POSTGRES_USER || 'empatia_admin',
-  password: process.env.POSTGRES_PASSWORD || 'bigmoneycoming',
-  database: process.env.POSTGRES_DB || 'empatia_db',
+  user: process.env.POSTGRES_USER,
+  password: process.env.POSTGRES_PASSWORD,
+  database: process.env.POSTGRES_DB,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 5000,
 });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PostgresAdapter(pool),
   providers: [
     Credentials({
       credentials: {

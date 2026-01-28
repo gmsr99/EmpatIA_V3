@@ -10,6 +10,7 @@ export class AudioPlaybackManager {
   private currentSource: AudioBufferSourceNode | null = null;
   // Gemini Live API retorna áudio PCM 16-bit a 24kHz
   private sampleRate = 24000;
+  private outputGain = 0.7;
   private destination: MediaStreamAudioDestinationNode | null = null;
   private outputStream: MediaStream | null = null;
 
@@ -97,10 +98,15 @@ export class AudioPlaybackManager {
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
 
+    // GainNode para aterrizar o nível e evitar clipping
+    const gain = this.audioContext.createGain();
+    gain.gain.value = this.outputGain;
+
     // Conectar aos speakers E ao destination para visualização
-    source.connect(this.audioContext.destination);
+    source.connect(gain);
+    gain.connect(this.audioContext.destination);
     if (this.destination) {
-      source.connect(this.destination);
+      gain.connect(this.destination);
     }
 
     // Quando terminar, tocar o próximo
