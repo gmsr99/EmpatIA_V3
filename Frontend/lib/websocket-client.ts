@@ -4,9 +4,9 @@
  */
 
 export type WebSocketMessage =
-  | { type: "session_created"; session_id: string; user_id: string }
-  | { type: "pong" }
-  | { type: "error"; message: string };
+  | { type: 'session_created'; session_id: string; user_id: string }
+  | { type: 'pong' }
+  | { type: 'error'; message: string };
 
 export type WebSocketClientEvents = {
   open: () => void;
@@ -18,6 +18,7 @@ export type WebSocketClientEvents = {
 
 export class WebSocketClient {
   private ws: WebSocket | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   private listeners: Map<keyof WebSocketClientEvents, Set<Function>> = new Map();
   private url: string;
   private userId: string;
@@ -37,50 +38,58 @@ export class WebSocketClient {
     return new Promise((resolve, reject) => {
       try {
         this.ws = new WebSocket(this.url);
-        this.ws.binaryType = "arraybuffer";
+        this.ws.binaryType = 'arraybuffer';
 
         this.ws.onopen = () => {
-          console.log("✅ WebSocket conectado");
+          console.log('✅ WebSocket conectado');
           this.reconnectAttempts = 0;
-          this.emit("open");
+          this.emit('open');
           resolve();
         };
 
         this.ws.onclose = (event) => {
-          console.log("🔌 WebSocket desconectado", event.code, event.reason);
-          this.emit("close", event);
+          console.log('🔌 WebSocket desconectado', event.code, event.reason);
+          this.emit('close', event);
 
           // Auto-reconnect se não foi fechado intencionalmente
-          if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
+          if (
+            event.code !== 1000 &&
+            this.reconnectAttempts < this.maxReconnectAttempts
+          ) {
             this.reconnectAttempts++;
-            console.log(`🔄 Tentativa de reconexão ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
-            setTimeout(() => this.connect(), this.reconnectDelay * this.reconnectAttempts);
+            console.log(
+              `🔄 Tentativa de reconexão ${this.reconnectAttempts}/${this.maxReconnectAttempts}`
+            );
+            setTimeout(
+              () => this.connect(),
+              this.reconnectDelay * this.reconnectAttempts
+            );
           }
         };
 
         this.ws.onerror = (error) => {
-          console.error("❌ Erro WebSocket:", error);
-          this.emit("error", error);
+          console.error('❌ Erro WebSocket:', error);
+          this.emit('error', error);
           reject(error);
         };
 
         this.ws.onmessage = (event) => {
-          if (typeof event.data === "string") {
+          if (typeof event.data === 'string') {
             // Mensagem JSON de controlo
             try {
               const message = JSON.parse(event.data) as WebSocketMessage;
-              console.log("📨 Mensagem recebida:", message);
-              this.emit("message", message);
+              console.log('📨 Mensagem recebida:', message);
+              this.emit('message', message);
             } catch (err) {
-              console.error("Erro ao parsear mensagem JSON:", err);
+              console.error('Erro ao parsear mensagem JSON:', err);
             }
           } else if (event.data instanceof ArrayBuffer) {
             // Dados de áudio binários
-            this.emit("audioChunk", event.data);
+            this.emit('audioChunk', event.data);
           }
         };
       } catch (error) {
-        console.error("Erro ao criar WebSocket:", error);
+        console.error('Erro ao criar WebSocket:', error);
         reject(error);
       }
     });
@@ -92,7 +101,7 @@ export class WebSocketClient {
   disconnect(): void {
     if (this.ws) {
       this.reconnectAttempts = this.maxReconnectAttempts; // Prevenir auto-reconnect
-      this.ws.close(1000, "Desconexão intencional");
+      this.ws.close(1000, 'Desconexão intencional');
       this.ws = null;
     }
   }
@@ -109,6 +118,7 @@ export class WebSocketClient {
   /**
    * Envia mensagem JSON de controlo
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sendMessage(message: Record<string, any>): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
@@ -153,12 +163,14 @@ export class WebSocketClient {
    */
   private emit<K extends keyof WebSocketClientEvents>(
     event: K,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ...args: any[]
   ): void {
     const listeners = this.listeners.get(event);
     if (listeners) {
       listeners.forEach((callback) => {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (callback as any)(...args);
         } catch (error) {
           console.error(`Erro no listener de ${event}:`, error);
@@ -167,3 +179,4 @@ export class WebSocketClient {
     }
   }
 }
+
