@@ -25,13 +25,34 @@ class Settings(BaseSettings):
     websocket_host: str = Field("0.0.0.0", env="WEBSOCKET_HOST")
     websocket_port: int = Field(8765, env="WEBSOCKET_PORT")
 
-    # Gemini Model Configuration
+    # Gemini Model Configuration (legacy - kept for google_search tool)
     gemini_model: str = Field(
         "gemini-live-2.5-flash-native-audio", env="GEMINI_MODEL"
     )
     gemini_voice: str = Field("Kore", env="GEMINI_VOICE")
     gemini_language: str = Field("pt-PT", env="GEMINI_LANGUAGE")
     gemini_temperature: float = Field(0.6, env="GEMINI_TEMPERATURE")
+
+    # Groq (STT - Whisper)
+    groq_api_key: str = Field(..., env="GROQ_API_KEY")
+    groq_stt_model: str = Field("whisper-large-v3", env="GROQ_STT_MODEL")
+    groq_stt_language: str = Field("pt", env="GROQ_STT_LANGUAGE")
+
+    # Gemini LLM (text reasoning - replaces Gemini Live)
+    gemini_llm_model: str = Field("gemini-2.5-flash-lite", env="GEMINI_LLM_MODEL")
+
+    # Google Cloud TTS (WaveNet)
+    tts_voice_name: str = Field("pt-PT-Wavenet-D", env="TTS_VOICE_NAME")
+    tts_sample_rate: int = Field(24000, env="TTS_SAMPLE_RATE")
+    tts_speaking_rate: float = Field(0.9, env="TTS_SPEAKING_RATE")
+
+    # Report generation (Gemini 2.0 Flash)
+    gemini_report_model: str = Field("gemini-2.0-flash", env="GEMINI_REPORT_MODEL")
+
+    # VAD (Voice Activity Detection)
+    vad_silence_threshold: float = Field(0.01, env="VAD_SILENCE_THRESHOLD")
+    vad_silence_duration_ms: int = Field(1500, env="VAD_SILENCE_DURATION_MS")
+    vad_min_speech_duration_ms: int = Field(300, env="VAD_MIN_SPEECH_DURATION_MS")
 
     @property
     def postgres_dsn(self) -> str:

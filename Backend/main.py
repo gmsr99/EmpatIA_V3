@@ -1,6 +1,6 @@
 """
 EmpatIA Backend - Agente de voz empático para idosos
-Baseado no Google Gen AI Agent Development Kit (ADK)
+Pipeline modular: Groq STT → Gemini Flash Lite → WaveNet TTS
 """
 
 import asyncio
@@ -59,13 +59,14 @@ class EmpatIABackend:
         logger.info("EmpatIA Backend - A iniciar")
         logger.info("=" * 60)
 
-        logger.info("Configuração:")
+        logger.info("Configuração (Pipeline Modular):")
         logger.info(f"  - PostgreSQL: {settings.postgres_host}:{settings.postgres_port}")
         logger.info(f"  - Database: {settings.postgres_db}")
         logger.info(f"  - WebSocket: {settings.websocket_host}:{settings.websocket_port}")
-        logger.info(f"  - Modelo: {settings.gemini_model}")
-        logger.info(f"  - Voz: {settings.gemini_voice}")
-        logger.info(f"  - Idioma: {settings.gemini_language}")
+        logger.info(f"  - STT: Groq Whisper ({settings.groq_stt_model})")
+        logger.info(f"  - LLM: {settings.gemini_llm_model}")
+        logger.info(f"  - TTS: {settings.tts_voice_name} @ {settings.tts_sample_rate}Hz")
+        logger.info(f"  - Report: {settings.gemini_report_model}")
 
         try:
             # Inicializar agente

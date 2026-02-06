@@ -1,18 +1,18 @@
-"""EmpatIA Agent - Agente de voz empático baseado no Google ADK."""
+"""EmpatIA Agent - Pipeline modular: Groq STT → Gemini Flash Lite → WaveNet TTS."""
 
 import asyncio
-import os
+import re
 from datetime import datetime
-from typing import Optional, Dict, Any, AsyncIterator
+from typing import Optional, Dict, Any, AsyncIterator, List, Tuple
 import uuid
 
 import structlog
-from google import genai
 from google.genai import types
 
 from src.config import settings
 from src.database import MemoryStore, DatabaseConnection
 from src.agent.system_prompt import get_system_prompt
+from src.services import STTService, LLMService, TTSService, ReportService, VADProcessor
 from src.tools import (
     manage_memory_tool,
     ManageMemoryInput,
@@ -26,18 +26,19 @@ logger = structlog.get_logger(__name__)
 
 
 class EmpatIASession:
-    """Representa uma sessão de conversa com o utilizador."""
+    """Representa uma sessao de conversa com o utilizador."""
 
     def __init__(self, user_id: str, session_id: Optional[str] = None):
         self.user_id = user_id
         self.session_id = session_id or str(uuid.uuid4())
         self.started_at = datetime.now()
-        self.conversation_turns = []
+        self.conversation_turns = []  # Para logging/report (com timestamps)
+        self.conversation_history = []  # Para o LLM: [{"role": "user"|"model", "text": "..."}]
         self.key_topics = set()
         self.memory_store = MemoryStore()
 
     async def get_context(self) -> Dict[str, Any]:
-        """Obtém o contexto completo do utilizador para injetar no system prompt."""
+        """Obtem o contexto completo do utilizador para injetar no system prompt."""
         profile = await self.memory_store.get_user_profile(self.user_id)
         recent_episodes = await self.memory_store.get_recent_episodes(
             self.user_id, limit=3
@@ -55,7 +56,7 @@ class EmpatIASession:
         )
 
     async def save_episode(self, summary: str, emotional_tone: str):
-        """Guarda o episódio de conversa na base de dados."""
+        """Guarda o episodio de conversa na base de dados."""
         duration = (datetime.now() - self.started_at).seconds // 60
 
         await self.memory_store.save_episode(
@@ -69,7 +70,7 @@ class EmpatIASession:
         )
 
         logger.info(
-            "Episódio guardado",
+            "Episodio guardado",
             user_id=self.user_id,
             session_id=self.session_id,
             duration=duration,
@@ -77,43 +78,46 @@ class EmpatIASession:
 
 
 class EmpatIAAgent:
-    """Agente EmpatIA com suporte a streaming de áudio bidireccional."""
+    """Agente EmpatIA com pipeline modular: STT → LLM → TTS."""
 
     def __init__(self):
-        self.client: Optional[genai.Client] = None
         self.active_sessions: Dict[str, EmpatIASession] = {}
         self.memory_store = MemoryStore()
 
+        # Servicos da pipeline
+        self.stt_service = STTService()
+        self.llm_service = LLMService()
+        self.tts_service = TTSService()
+        self.report_service = ReportService()
+
     async def initialize(self):
-        """Inicializa o agente e a conexão com a base de dados."""
+        """Inicializa o agente, base de dados e todos os servicos."""
         await DatabaseConnection.get_pool()
-        # Inicializar schema (seguro para múltiplas execuções - usa IF NOT EXISTS)
+        # Inicializar schema (seguro para multiplas execucoes - usa IF NOT EXISTS)
         await DatabaseConnection.init_schema()
-        logger.info("✅ Schema verificado/inicializado")
+        logger.info("Schema verificado/inicializado")
 
-        # Configurar autenticação Vertex AI
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = settings.google_application_credentials
-
-        # Inicializar cliente com Vertex AI
-        self.client = genai.Client(
-            vertexai=True,
-            project=settings.google_cloud_project,
-            location=settings.google_cloud_region,
-        )
+        # Inicializar servicos
+        await self.llm_service.initialize()
+        await self.tts_service.initialize()
+        await self.report_service.initialize()
+        # STTService inicializa o client no __init__ (sem async setup)
 
         logger.info(
-            "Agente EmpatIA inicializado",
-            project=settings.google_cloud_project,
-            region=settings.google_cloud_region,
+            "Agente EmpatIA inicializado (pipeline modular)",
+            stt=settings.groq_stt_model,
+            llm=settings.gemini_llm_model,
+            tts=settings.tts_voice_name,
+            report=settings.gemini_report_model,
         )
 
     async def create_session(self, user_id: str) -> EmpatIASession:
-        """Cria uma nova sessão para o utilizador."""
+        """Cria uma nova sessao para o utilizador."""
         session = EmpatIASession(user_id)
         self.active_sessions[session.session_id] = session
 
         logger.info(
-            "Nova sessão criada",
+            "Nova sessao criada",
             user_id=user_id,
             session_id=session.session_id,
         )
@@ -121,7 +125,7 @@ class EmpatIAAgent:
         return session
 
     async def get_session(self, session_id: str) -> Optional[EmpatIASession]:
-        """Obtém uma sessão existente."""
+        """Obtem uma sessao existente."""
         return self.active_sessions.get(session_id)
 
     async def _execute_tool(
@@ -137,14 +141,13 @@ class EmpatIAAgent:
             )
 
             if tool_name == "manage_memory":
-                # Validar que tool_input é dict
                 if not isinstance(tool_input, dict):
                     logger.error(
-                        "tool_input não é dict",
+                        "tool_input nao e dict",
                         tool_input=tool_input,
                         type=type(tool_input),
                     )
-                    return {"success": False, "error": "Parâmetros inválidos"}
+                    return {"success": False, "error": "Parametros invalidos"}
 
                 params = ManageMemoryInput(**tool_input)
                 return await manage_memory_tool(params, user_id)
@@ -152,11 +155,11 @@ class EmpatIAAgent:
             elif tool_name == "google_search":
                 if not isinstance(tool_input, dict):
                     logger.error(
-                        "tool_input não é dict",
+                        "tool_input nao e dict",
                         tool_input=tool_input,
                         type=type(tool_input),
                     )
-                    return {"success": False, "error": "Parâmetros inválidos"}
+                    return {"success": False, "error": "Parametros invalidos"}
 
                 params = GoogleSearchInput(**tool_input)
                 return await google_search_tool(params)
@@ -177,22 +180,44 @@ class EmpatIAAgent:
             )
             return {"success": False, "error": str(e)}
 
+    @staticmethod
+    def _extract_sentences(text: str) -> Tuple[List[str], str]:
+        """
+        Extrai frases completas de um buffer de texto.
+
+        Returns:
+            (lista_de_frases_completas, buffer_restante)
+        """
+        sentences = []
+        # Procurar frases terminadas em . ! ? seguido de espaco ou fim
+        pattern = r"([^.!?]*[.!?])(?:\s|$)"
+
+        while True:
+            match = re.search(pattern, text)
+            if match:
+                sentence = match.group(1).strip()
+                if sentence:
+                    sentences.append(sentence)
+                text = text[match.end() :]
+            else:
+                break
+
+        return sentences, text
+
     async def stream_conversation(
         self, session: EmpatIASession, audio_stream: AsyncIterator[bytes]
     ) -> AsyncIterator[bytes]:
         """
-        Mantém uma conversa de voz bidireccional streaming.
+        Pipeline de conversa turn-based:
+        Audio → VAD → Groq STT → Gemini Flash Lite (com tools) → WaveNet TTS → Audio
 
         Args:
-            session: Sessão do utilizador
-            audio_stream: Stream de áudio de entrada do cliente
+            session: Sessao do utilizador
+            audio_stream: Stream de audio de entrada do cliente
 
         Yields:
-            Bytes de áudio de resposta
+            Bytes de audio de resposta (PCM 16-bit 24kHz)
         """
-        if not self.client:
-            raise RuntimeError("Agente não inicializado")
-
         # Obter contexto do utilizador
         context = await session.get_context()
         system_prompt = get_system_prompt(
@@ -200,199 +225,119 @@ class EmpatIAAgent:
             recent_episodes=context["recent_episodes"],
         )
 
-        # Configurar modelo com voice config, generation config e tools
-        config = types.LiveConnectConfig(
-            response_modalities=["AUDIO"],
-            system_instruction=types.Content(
-                parts=[types.Part(text=system_prompt)]
+        # Declaracoes de tools (reutilizadas do sistema anterior)
+        tool_declarations = [
+            types.FunctionDeclaration(
+                name=MANAGE_MEMORY_TOOL_DEFINITION["name"],
+                description=MANAGE_MEMORY_TOOL_DEFINITION["description"],
+                parameters=MANAGE_MEMORY_TOOL_DEFINITION["parameters"],
             ),
-            generation_config=types.GenerationConfig(
-                temperature=settings.gemini_temperature,
+            types.FunctionDeclaration(
+                name=GOOGLE_SEARCH_TOOL_DEFINITION["name"],
+                description=GOOGLE_SEARCH_TOOL_DEFINITION["description"],
+                parameters=GOOGLE_SEARCH_TOOL_DEFINITION["parameters"],
             ),
-            speech_config=types.SpeechConfig(
-                voice_config=types.VoiceConfig(
-                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                        voice_name=settings.gemini_voice
-                    )
-                )
-            ),
-            tools=[
-                types.Tool(function_declarations=[
-                    types.FunctionDeclaration(
-                        name=MANAGE_MEMORY_TOOL_DEFINITION["name"],
-                        description=MANAGE_MEMORY_TOOL_DEFINITION["description"],
-                        parameters=MANAGE_MEMORY_TOOL_DEFINITION["parameters"],
-                    ),
-                    types.FunctionDeclaration(
-                        name=GOOGLE_SEARCH_TOOL_DEFINITION["name"],
-                        description=GOOGLE_SEARCH_TOOL_DEFINITION["description"],
-                        parameters=GOOGLE_SEARCH_TOOL_DEFINITION["parameters"],
-                    ),
-                ])
-            ],
-        )
+        ]
+
+        # Callback para execucao de tools
+        async def execute_tool(
+            tool_name: str, tool_args: Dict[str, Any]
+        ) -> Dict[str, Any]:
+            return await self._execute_tool(tool_name, tool_args, session.user_id)
+
+        # Processador VAD
+        vad = VADProcessor()
 
         logger.info(
-            "A iniciar conversa streaming",
+            "A iniciar conversa turn-based",
             user_id=session.user_id,
             session_id=session.session_id,
-            voice=settings.gemini_voice,
         )
 
         try:
-            logger.info("A conectar à Gemini Live API", model=settings.gemini_model)
-            async with self.client.aio.live.connect(
-                model=settings.gemini_model, config=config
-            ) as live_session:
-                logger.info("Conexão Live estabelecida (system_instruction no config)")
+            # Processar utterances detectadas pelo VAD
+            async for utterance_pcm in vad.process_stream(audio_stream):
+                # Passo 1: STT — Converter fala em texto
+                user_text = await self.stt_service.transcribe(utterance_pcm)
 
-                # Processar audio stream de entrada
-                async def send_audio():
-                    """Envia áudio do cliente para o modelo."""
-                    chunks_sent = 0
-                    total_bytes = 0
-                    try:
-                        async for audio_chunk in audio_stream:
-                            chunks_sent += 1
-                            chunk_size = len(audio_chunk)
-                            total_bytes += chunk_size
+                if not user_text:
+                    logger.warning("STT retornou texto vazio, a ignorar turno")
+                    continue
 
-                            if chunks_sent == 1:
-                                logger.info("Primeiro chunk de áudio enviado ao Gemini", chunk_size=chunk_size)
-                            if chunks_sent % 50 == 0:
-                                logger.info(
-                                    f"Enviados {chunks_sent} chunks de áudio ao Gemini",
-                                    total_bytes=total_bytes,
-                                    avg_chunk_size=total_bytes // chunks_sent
-                                )
+                logger.info("Utilizador disse", text=user_text[:100])
 
-                            await live_session.send_realtime_input(
-                                audio=types.Blob(
-                                    mime_type="audio/pcm;rate=16000",
-                                    data=audio_chunk,
-                                )
-                            )
-                    except Exception as e:
-                        logger.error("Erro no send_audio", error=str(e), chunks_sent=chunks_sent)
+                # Registar turno do utilizador
+                session.add_turn("user", user_text)
+                session.conversation_history.append(
+                    {"role": "user", "text": user_text}
+                )
 
-                # Iniciar task de envio
-                send_task = asyncio.create_task(send_audio())
+                # Passo 2: LLM — Gerar resposta de texto (streaming)
+                sentence_buffer = ""
+                full_response = ""
 
-                # Processar respostas do modelo
-                audio_responses = 0
-                text_responses = 0
-                turn_count = 0
-                session_active = True
+                async for text_chunk in self.llm_service.generate_response(
+                    user_text=user_text,
+                    system_prompt=system_prompt,
+                    conversation_history=session.conversation_history[:-1],
+                    tool_declarations=tool_declarations,
+                    execute_tool=execute_tool,
+                ):
+                    sentence_buffer += text_chunk
+                    full_response += text_chunk
 
-                try:
-                    # Loop contínuo para manter sessão aberta
-                    while session_active and not send_task.done():
-                        try:
-                            # Receber respostas com timeout
-                            async for response in live_session.receive():
-                                # Log de TODOS os tipos de resposta
-                                logger.debug(
-                                    "Resposta Gemini recebida",
-                                    has_server_content=bool(response.server_content),
-                                    has_tool_call=bool(response.tool_call),
-                                )
+                    # Detectar limites de frase para TTS progressivo
+                    sentences, sentence_buffer = self._extract_sentences(
+                        sentence_buffer
+                    )
 
-                                # Processar server content (áudio de resposta)
-                                if response.server_content:
-                                    server_content = response.server_content
+                    for sentence in sentences:
+                        # Passo 3: TTS — Converter frase para audio
+                        audio_pcm = await self.tts_service.synthesize(sentence)
+                        if audio_pcm:
+                            # Enviar em chunks (max 32KB) para nao sobrecarregar o WS
+                            chunk_size = 32000  # ~0.67s de audio a 24kHz 16-bit
+                            for i in range(0, len(audio_pcm), chunk_size):
+                                yield audio_pcm[i : i + chunk_size]
 
-                                    # model_turn contém os parts com áudio/texto
-                                    if server_content.model_turn and server_content.model_turn.parts:
-                                        for part in server_content.model_turn.parts:
-                                            # Áudio de resposta
-                                            if part.inline_data and part.inline_data.data:
-                                                audio_responses += 1
-                                                audio_size = len(part.inline_data.data)
-                                                logger.info(f"🔊 Áudio recebido #{audio_responses}", size=audio_size)
-                                                yield part.inline_data.data
+                # Flush do texto restante no buffer
+                if sentence_buffer.strip():
+                    audio_pcm = await self.tts_service.synthesize(
+                        sentence_buffer.strip()
+                    )
+                    if audio_pcm:
+                        chunk_size = 32000
+                        for i in range(0, len(audio_pcm), chunk_size):
+                            yield audio_pcm[i : i + chunk_size]
 
-                                            # Texto de resposta (para logging)
-                                            if part.text:
-                                                text_responses += 1
-                                                session.add_turn("assistant", part.text)
-                                                logger.info(
-                                                    f"💬 Texto recebido #{text_responses}",
-                                                    text=part.text[:100] if len(part.text) > 100 else part.text
-                                                )
+                # Registar turno do assistente
+                if full_response:
+                    session.add_turn("assistant", full_response)
+                    session.conversation_history.append(
+                        {"role": "model", "text": full_response}
+                    )
 
-                                    # Verificar se o turno está completo
-                                    if server_content.turn_complete:
-                                        turn_count += 1
-                                        logger.info(f"✅ Turn #{turn_count} completo - aguardando mais input...")
-                                        # NÃO sair do loop - continuar a escutar
+                logger.info(
+                    "Turno completo", response_length=len(full_response)
+                )
 
-                                    # Verificar se foi interrompido
-                                    if server_content.interrupted:
-                                        logger.info("⚠️ Resposta interrompida pelo utilizador")
-
-                                # Processar tool calls
-                                if response.tool_call:
-                                    tool_call = response.tool_call
-                                    function_calls = tool_call.function_calls if hasattr(tool_call, 'function_calls') else []
-
-                                    for call in function_calls:
-                                        call_name = call.name if hasattr(call, 'name') else None
-                                        call_args = call.args if hasattr(call, 'args') else {}
-
-                                        if call_name:
-                                            logger.info("Tool call recebido", tool_name=call_name, args_type=type(call_args).__name__)
-
-                                            # Converter args para dict se for protobuf Struct
-                                            if hasattr(call_args, '_pb'):
-                                                # É um protobuf Struct, converter para dict
-                                                import json
-                                                from google.protobuf.json_format import MessageToDict
-                                                call_args = MessageToDict(call_args._pb)
-                                            elif not isinstance(call_args, dict):
-                                                # Tentar converter para dict
-                                                call_args = dict(call_args) if call_args else {}
-
-                                            tool_result = await self._execute_tool(
-                                                call_name, call_args, session.user_id
-                                            )
-
-                                            # Enviar resultado da tool
-                                            await live_session.send_tool_response(
-                                                function_responses=types.FunctionResponse(
-                                                    name=call_name,
-                                                    response=tool_result,
-                                                )
-                                            )
-
-                                # Processar setup_complete (confirmação inicial)
-                                if hasattr(response, 'setup_complete') and response.setup_complete:
-                                    logger.info("Setup da sessão Live completo")
-
-                            # Se o iterador terminou, pode significar que a sessão fechou
-                            logger.info("Iterador receive() terminou, verificando estado...")
-
-                        except StopAsyncIteration:
-                            logger.info("Receive iterator exhausted, session may have ended")
-                            session_active = False
-
-                except asyncio.CancelledError:
-                    logger.info("Stream cancelado pelo cliente")
-                    session_active = False
-
-                finally:
-                    send_task.cancel()
-                    try:
-                        await send_task
-                    except asyncio.CancelledError:
-                        pass
-
+        except asyncio.CancelledError:
+            logger.info("Conversa cancelada pelo cliente")
         except Exception as e:
             logger.error(
-                "Erro na conversa streaming",
+                "Erro na pipeline de conversa",
                 error=str(e),
                 session_id=session.session_id,
+                exc_info=True,
             )
             raise
+        finally:
+            # Flush de buffer VAD restante
+            remaining = vad.close()
+            if remaining and len(remaining) > 1000:
+                user_text = await self.stt_service.transcribe(remaining)
+                if user_text:
+                    session.add_turn("user", user_text)
 
         logger.info(
             "Conversa finalizada",
@@ -401,19 +346,29 @@ class EmpatIAAgent:
         )
 
     async def end_session(self, session_id: str):
-        """Termina uma sessão e guarda o episódio."""
+        """Termina uma sessao, gera relatorio e guarda o episodio."""
         session = self.active_sessions.get(session_id)
         if session:
-            # Gerar resumo e guardar episódio
-            # (isto poderia usar o próprio Gemini para resumir)
+            # Gerar relatorio usando Gemini 2.0 Flash
+            report = await self.report_service.generate_report(
+                session.conversation_turns
+            )
+
+            # Guardar episodio com dados reais do relatorio
+            session.key_topics = set(report.get("key_topics", []))
+
             await session.save_episode(
-                summary="Conversa com EmpatIA",
-                emotional_tone="neutro",
+                summary=report.get("summary", "Conversa com EmpatIA"),
+                emotional_tone=report.get("emotional_tone", "neutro"),
             )
 
             del self.active_sessions[session_id]
 
-            logger.info("Sessão terminada", session_id=session_id)
+            logger.info(
+                "Sessao terminada com relatorio",
+                session_id=session_id,
+                summary=report.get("summary", "")[:80],
+            )
 
     async def shutdown(self):
         """Encerra o agente graciosamente."""
@@ -424,5 +379,5 @@ class EmpatIAAgent:
         logger.info("Agente EmpatIA encerrado")
 
 
-# Instância global do agente
+# Instancia global do agente
 agent = EmpatIAAgent()
