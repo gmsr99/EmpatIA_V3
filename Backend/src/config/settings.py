@@ -33,16 +33,18 @@ class Settings(BaseSettings):
     gemini_language: str = Field("pt-PT", env="GEMINI_LANGUAGE")
     gemini_temperature: float = Field(0.6, env="GEMINI_TEMPERATURE")
 
-    # Groq (STT - Whisper)
-    groq_api_key: str = Field(..., env="GROQ_API_KEY")
-    groq_stt_model: str = Field("whisper-large-v3", env="GROQ_STT_MODEL")
-    groq_stt_language: str = Field("pt", env="GROQ_STT_LANGUAGE")
+    # Deepgram (STT - Nova-3)
+    deepgram_api_key: str = Field(..., env="DEEPGRAM_API_KEY")
+    deepgram_model: str = Field("nova-3", env="DEEPGRAM_MODEL")
+    deepgram_language: str = Field("pt", env="DEEPGRAM_LANGUAGE")
 
     # Gemini LLM (text reasoning - replaces Gemini Live)
-    gemini_llm_model: str = Field("gemini-2.5-flash-lite", env="GEMINI_LLM_MODEL")
+    gemini_llm_model: str = Field("gemini-2.5-flash", env="GEMINI_LLM_MODEL")
 
-    # Google Cloud TTS (WaveNet)
-    tts_voice_name: str = Field("pt-PT-Wavenet-D", env="TTS_VOICE_NAME")
+    # Azure Cognitive Services TTS (Neural voices)
+    azure_speech_key: str = Field(..., env="AZURE_SPEECH_KEY")
+    azure_speech_region: str = Field("westeurope", env="AZURE_SPEECH_REGION")
+    tts_voice_name: str = Field("pt-PT-RaquelNeural", env="TTS_VOICE_NAME")
     tts_sample_rate: int = Field(24000, env="TTS_SAMPLE_RATE")
     tts_speaking_rate: float = Field(0.9, env="TTS_SPEAKING_RATE")
 
@@ -51,7 +53,7 @@ class Settings(BaseSettings):
 
     # VAD (Voice Activity Detection)
     vad_silence_threshold: float = Field(0.01, env="VAD_SILENCE_THRESHOLD")
-    vad_silence_duration_ms: int = Field(1500, env="VAD_SILENCE_DURATION_MS")
+    vad_silence_duration_ms: int = Field(700, env="VAD_SILENCE_DURATION_MS")
     vad_min_speech_duration_ms: int = Field(300, env="VAD_MIN_SPEECH_DURATION_MS")
 
     @property

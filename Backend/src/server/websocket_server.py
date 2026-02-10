@@ -109,8 +109,18 @@ class WebSocketConnection:
         """Stream de áudio do agente para o cliente."""
         try:
             logger.info("A iniciar stream de conversa com agente", user_id=self.user_id)
+
+            # Callback para enviar transcrições ao cliente
+            async def send_transcript(role: str, text: str):
+                """Envia transcrição (legendas) para o frontend."""
+                await self.send_json({
+                    "type": "transcript",
+                    "role": role,
+                    "text": text
+                })
+
             async for audio_chunk in agent.stream_conversation(
-                self.session, self.audio_input_queue
+                self.session, self.audio_input_queue, send_transcript
             ):
                 if self.is_active:
                     logger.debug(f"Enviando chunk de áudio: {len(audio_chunk)} bytes")

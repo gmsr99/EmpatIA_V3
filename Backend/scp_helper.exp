@@ -1,0 +1,14 @@
+#!/usr/bin/expect -f
+set timeout 30
+set password "3f-O78sAL@e/?cDw,Q.D"
+set source [lindex $argv 0]
+set dest [lindex $argv 1]
+
+spawn scp -o StrictHostKeyChecking=no $source $dest
+expect {
+    "password:" {
+        send "$password\r"
+        expect eof
+    }
+    eof
+}

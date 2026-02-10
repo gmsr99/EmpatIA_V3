@@ -6,6 +6,7 @@
 export type WebSocketMessage =
   | { type: 'session_created'; session_id: string; user_id: string }
   | { type: 'pong' }
+  | { type: 'transcript'; role: 'user' | 'assistant'; text: string }
   | { type: 'error'; message: string };
 
 export type WebSocketClientEvents = {
@@ -14,6 +15,7 @@ export type WebSocketClientEvents = {
   error: (error: Event) => void;
   message: (data: WebSocketMessage) => void;
   audioChunk: (audioData: ArrayBuffer) => void;
+  transcript: (role: 'user' | 'assistant', text: string) => void;
 };
 
 export class WebSocketClient {
@@ -73,6 +75,12 @@ export class WebSocketClient {
             try {
               const message = JSON.parse(event.data) as WebSocketMessage;
               console.log('📨 Mensagem recebida:', message);
+
+              // Emit specific event for transcripts
+              if (message.type === 'transcript') {
+                this.emit('transcript', message.role, message.text);
+              }
+
               this.emit('message', message);
             } catch (err) {
               console.error('Erro ao parsear mensagem JSON:', err);

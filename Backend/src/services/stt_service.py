@@ -1,10 +1,10 @@
-"""STT Service - Speech-to-Text usando Groq Whisper v3."""
+"""STT Service - Speech-to-Text usando Deepgram Nova-3."""
 
 import io
 import wave
 
 import structlog
-from groq import AsyncGroq
+from deepgram import AsyncDeepgramClient
 
 from src.config import settings
 
@@ -12,17 +12,17 @@ logger = structlog.get_logger(__name__)
 
 
 class STTService:
-    """Speech-to-Text usando Groq Whisper Large v3."""
+    """Speech-to-Text usando Deepgram Nova-3."""
 
     def __init__(self):
-        self.client = AsyncGroq(api_key=settings.groq_api_key)
-        self.model = settings.groq_stt_model
-        self.language = settings.groq_stt_language
+        self.client = AsyncDeepgramClient(api_key=settings.deepgram_api_key)
+        self.model = settings.deepgram_model
+        self.language = settings.deepgram_language
 
     def _pcm_to_wav(self, pcm_bytes: bytes) -> bytes:
         """
         Converte PCM 16-bit 16kHz mono raw para formato WAV.
-        O Groq Whisper requer um formato de ficheiro de audio valido.
+        Deepgram requer um formato de ficheiro de audio valido.
         """
         wav_buffer = io.BytesIO()
         with wave.open(wav_buffer, "wb") as wav_file:
@@ -44,21 +44,34 @@ class STTService:
             Texto transcrito. String vazia se a transcricao falhar.
         """
         try:
+            # Converter PCM para WAV
             wav_bytes = self._pcm_to_wav(pcm_audio)
 
-            # Groq espera um tuplo de ficheiro: (filename, bytes, content_type)
-            transcription = await self.client.audio.transcriptions.create(
-                file=("utterance.wav", wav_bytes, "audio/wav"),
+            # Async - não bloqueia o event loop
+            response = await self.client.listen.v1.media.transcribe_file(
+                request=wav_bytes,
                 model=self.model,
                 language=self.language,
-                response_format="text",
+                smart_format=True,  # Formatação automática de pontuação
             )
 
-            text = (
-                transcription.strip()
-                if isinstance(transcription, str)
-                else str(transcription).strip()
-            )
+            # Extrair o texto transcrito
+            text = ""
+            if (
+                response
+                and hasattr(response, "results")
+                and response.results
+                and hasattr(response.results, "channels")
+                and response.results.channels
+                and len(response.results.channels) > 0
+            ):
+                channel = response.results.channels[0]
+                if (
+                    hasattr(channel, "alternatives")
+                    and channel.alternatives
+                    and len(channel.alternatives) > 0
+                ):
+                    text = channel.alternatives[0].transcript.strip()
 
             logger.info(
                 "STT transcricao completa",

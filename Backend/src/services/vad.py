@@ -45,6 +45,71 @@ class VADProcessor:
         rms = math.sqrt(sum_sq / num_samples) / 32768.0  # Normalizar para 0-1
         return rms
 
+    @property
+    def is_speaking(self) -> bool:
+        """Whether the user is currently speaking."""
+        return self._is_speaking
+
+    def _reset_state(self):
+        """Reset VAD state after utterance."""
+        self._audio_buffer = bytearray()
+        self._is_speaking = False
+        self._silence_start = None
+        self._speech_start = None
+
+    def feed(self, chunk: bytes) -> Optional[bytes]:
+        """
+        Feed a single chunk of audio. Returns complete utterance if detected, None otherwise.
+
+        Pull-based alternative to process_stream() — used by the background
+        audio consumer task so we can monitor for barge-in concurrently.
+        """
+        if self._closed:
+            return None
+
+        rms = self._calculate_rms(chunk)
+        now = time.monotonic()
+
+        if rms > self.silence_threshold:
+            # Speech detected
+            if not self._is_speaking:
+                self._is_speaking = True
+                self._speech_start = now
+                logger.debug("VAD: Fala iniciada")
+            self._silence_start = None
+            self._audio_buffer.extend(chunk)
+
+        else:
+            # Silence
+            if self._is_speaking:
+                self._audio_buffer.extend(chunk)
+
+                if self._silence_start is None:
+                    self._silence_start = now
+
+                silence_elapsed_ms = (now - self._silence_start) * 1000
+
+                if silence_elapsed_ms >= self.silence_duration_ms:
+                    speech_duration_ms = (
+                        (now - self._speech_start) * 1000
+                        if self._speech_start
+                        else 0
+                    )
+
+                    if speech_duration_ms >= self.min_speech_duration_ms:
+                        utterance = bytes(self._audio_buffer)
+                        logger.info(
+                            "VAD: Utterance completa",
+                            duration_ms=int(speech_duration_ms),
+                            size_bytes=len(utterance),
+                        )
+                        self._reset_state()
+                        return utterance
+
+                    self._reset_state()
+
+        return None
+
     async def process_stream(
         self, audio_stream: AsyncIterator[bytes]
     ) -> AsyncIterator[bytes]:

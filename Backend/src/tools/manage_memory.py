@@ -21,9 +21,9 @@ class ManageMemoryInput(BaseModel):
         ...,
         description="Categoria: familia, saude, hobbies, interesses, geral",
     )
-    entity_type: str = Field(
-        ...,
-        description="Tipo de entidade (ex: filho, neto, doenca, hobby)",
+    entity_type: Optional[str] = Field(
+        None,
+        description="Tipo de entidade (ex: filho, neto, doenca, hobby). Obrigatório para ADD.",
     )
     entity_name: Optional[str] = Field(
         None,
@@ -61,6 +61,8 @@ class MemoryTool:
             if params.action == "ADD":
                 if not params.content:
                     return {"success": False, "error": "Conteúdo obrigatório"}
+                if not params.entity_type:
+                    return {"success": False, "error": "entity_type obrigatório para ADD"}
 
                 memory = await self.store.add_memory(
                     user_id=user_id,

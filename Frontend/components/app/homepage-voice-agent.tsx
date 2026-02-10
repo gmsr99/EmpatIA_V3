@@ -7,6 +7,7 @@ import { AlertCircle, Loader2, MessageCircle, Mic, MicOff, X } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { useVoiceAgent } from '@/hooks/useVoiceAgent';
 import { GlowingRingVisualizer } from './glowing-ring-visualizer';
+import { TranscriptBox } from './transcript-box';
 
 export function HomepageVoiceAgent() {
   const { data: session, status } = useSession();
@@ -22,6 +23,7 @@ export function HomepageVoiceAgent() {
     isMicEnabled,
     error: agentError,
     outputStream,
+    transcripts,
     connect,
     disconnect,
     toggleMic,
@@ -72,8 +74,10 @@ export function HomepageVoiceAgent() {
 
   if (isConnected) {
     return (
-      <div className={containerClasses}>
-        <div className="relative flex h-full w-full flex-col items-center justify-center p-8">
+      <div className="flex w-full max-w-5xl flex-col gap-4 lg:flex-row">
+        {/* Visualizer Container */}
+        <div className={containerClasses}>
+          <div className="relative flex h-full w-full flex-col items-center justify-center p-8">
           {/* Connection Status Label */}
           <div className="text-brand-lilac absolute top-6 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium tracking-wider uppercase backdrop-blur-md">
             {state === 'speaking'
@@ -132,6 +136,10 @@ export function HomepageVoiceAgent() {
             </div>
           )}
         </div>
+        </div>
+
+        {/* Transcript Box */}
+        <TranscriptBox transcripts={transcripts} className="h-[400px] w-full lg:w-96" />
       </div>
     );
   }

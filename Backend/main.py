@@ -63,9 +63,9 @@ class EmpatIABackend:
         logger.info(f"  - PostgreSQL: {settings.postgres_host}:{settings.postgres_port}")
         logger.info(f"  - Database: {settings.postgres_db}")
         logger.info(f"  - WebSocket: {settings.websocket_host}:{settings.websocket_port}")
-        logger.info(f"  - STT: Groq Whisper ({settings.groq_stt_model})")
+        logger.info(f"  - STT: Deepgram ({settings.deepgram_model})")
         logger.info(f"  - LLM: {settings.gemini_llm_model}")
-        logger.info(f"  - TTS: {settings.tts_voice_name} @ {settings.tts_sample_rate}Hz")
+        logger.info(f"  - TTS: Azure {settings.tts_voice_name} @ {settings.tts_sample_rate}Hz")
         logger.info(f"  - Report: {settings.gemini_report_model}")
 
         try:

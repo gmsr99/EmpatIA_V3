@@ -15,6 +15,12 @@ export type VoiceAgentState =
   | "listening"
   | "error";
 
+export interface Transcript {
+  role: 'user' | 'assistant';
+  text: string;
+  timestamp: number;
+}
+
 export interface UseVoiceAgentReturn {
   state: VoiceAgentState;
   isConnected: boolean;
@@ -23,6 +29,7 @@ export interface UseVoiceAgentReturn {
   error: string | null;
   micStream: MediaStream | null;
   outputStream: MediaStream | null;
+  transcripts: Transcript[];
   connect: () => Promise<void>;
   disconnect: () => void;
   toggleMic: () => Promise<void>;
@@ -37,6 +44,7 @@ export function useVoiceAgent(userId: string): UseVoiceAgentReturn {
   const [error, setError] = useState<string | null>(null);
   const [micStream, setMicStream] = useState<MediaStream | null>(null);
   const [outputStream, setOutputStream] = useState<MediaStream | null>(null);
+  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
 
   const wsClientRef = useRef<WebSocketClient | null>(null);
   const playbackManagerRef = useRef<AudioPlaybackManager | null>(null);
@@ -227,6 +235,12 @@ export function useVoiceAgent(userId: string): UseVoiceAgentReturn {
         });
       });
 
+      wsClient.on("transcript", (role, text) => {
+        // Adicionar transcrição ao histórico
+        console.log(`📝 [useVoiceAgent] Transcript ${role}:`, text);
+        setTranscripts((prev) => [...prev, { role, text, timestamp: Date.now() }]);
+      });
+
       // Conectar ao WebSocket
       console.log('[useVoiceAgent] Calling wsClient.connect()');
       await wsClient.connect();
@@ -274,6 +288,9 @@ export function useVoiceAgent(userId: string): UseVoiceAgentReturn {
 
     // Limpar output stream
     setOutputStream(null);
+
+    // Limpar transcrições
+    setTranscripts([]);
 
     // Limpar audio context
     if (audioContextRef.current) {
@@ -342,6 +359,7 @@ export function useVoiceAgent(userId: string): UseVoiceAgentReturn {
     error,
     micStream,
     outputStream,
+    transcripts,
     connect,
     disconnect,
     toggleMic,

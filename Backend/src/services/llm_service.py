@@ -1,4 +1,4 @@
-"""LLM Service - Processamento de texto com Gemini 2.5 Flash Lite."""
+"""LLM Service - Processamento de texto com Gemini 2.5 Flash."""
 
 import json
 import os
@@ -15,7 +15,7 @@ logger = structlog.get_logger(__name__)
 
 class LLMService:
     """
-    LLM baseado em texto usando Gemini 2.5 Flash Lite.
+    LLM baseado em texto usando Gemini 2.5 Flash.
     Suporta respostas streaming e function calling.
     """
 
@@ -98,6 +98,10 @@ class LLMService:
 
         for _ in range(max_tool_rounds):
             had_tool_call = False
+            # Acumular TODAS as parts do modelo (texto + function_call)
+            # para que o follow-up apos tool call inclua o texto ja gerado.
+            # Sem isto, o modelo nao sabe que ja respondeu e duplica a resposta.
+            accumulated_parts = []
 
             response_stream = await self.client.aio.models.generate_content_stream(
                 model=self.model,
@@ -134,9 +138,13 @@ class LLMService:
                         # Executar a tool
                         tool_result = await execute_tool(tool_name, tool_args)
 
-                        # Adicionar tool call e resultado ao contents para follow-up
+                        # Incluir texto acumulado + function_call no follow-up
+                        # para o modelo saber o que ja disse antes da tool call
+                        accumulated_parts.append(part)
                         contents.append(
-                            types.Content(role="model", parts=[part])
+                            types.Content(
+                                role="model", parts=accumulated_parts
+                            )
                         )
                         contents.append(
                             types.Content(
@@ -155,8 +163,9 @@ class LLMService:
                         had_tool_call = True
                         break  # Sair do loop de parts para re-gerar
 
-                    # Texto normal
+                    # Texto normal — yield para TTS e acumular para contexto
                     elif hasattr(part, "text") and part.text:
+                        accumulated_parts.append(part)
                         yield part.text
 
                 if had_tool_call:
